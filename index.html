@@ -1,0 +1,390 @@
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>DayZ map</title>
+		<!-- ICON: https://game-icons.net/lorc/originals/treasure-map.html -->
+		<link rel="shortcut icon" type="image/x-icon" href="dayz_map-icon.ico" />
+		<link rel="icon" type="image/png" href="dayz_map-icon.png" />
+		<style>
+		body {
+			margin: 0;
+		}
+
+		#navbar {
+			overflow: hidden;
+			background-color: #099;
+			position: fixed;
+			top: 0;
+			width: 100%;
+			padding-top: 5px;
+			padding-bottom: 5px;
+			padding-left: 20px;
+		}
+
+		#navbar a {
+			color: #800000;
+			text-decoration: none;
+		}
+
+		#navbar a:hover {
+			background-color: #ddd;
+			color: black;
+		}
+
+		#navbar a.active {
+			background-color: #4CAF50;
+			color: white;
+		}
+
+		.main {
+			width: 100%;
+			overflow: hidden;
+			/* overflow-y: scroll; */
+			cursor: grab;
+			cursor: -o-grab;
+			cursor: -moz-grab;
+			cursor: -webkit-grab;
+		}
+
+		.main img {
+			height: auto;
+			width: 100%;
+		}
+		
+		.main:active, #map:active, .moving {
+			cursor: grabbing;
+			cursor: -o-grabbing;
+			cursor: -moz-grabbing;
+			cursor: -webkit-grabbing;
+		}
+		
+		.button {
+			width: 300px;
+			height: 60px;
+		}
+		</style>
+		<script type="text/javascript">
+		/**
+		 * @source https://cdn.rawgit.com/asvd/dragscroll/master/dragscroll.js
+		 * @fileoverview dragscroll - scroll area by dragging
+		 * @version 0.0.8
+		 * 
+		 * @license MIT, see http://github.com/asvd/dragscroll
+		 * @copyright 2015 asvd <heliosframework@gmail.com> 
+		 */
+
+
+		(function (root, factory) {
+			if (typeof define === 'function' && define.amd) {
+				define(['exports'], factory);
+			} else if (typeof exports !== 'undefined') {
+				factory(exports);
+			} else {
+				factory((root.dragscroll = {}));
+			}
+		}(this, function (exports) {
+			var _window = window;
+			var _document = document;
+			var mousemove = 'mousemove';
+			var mouseup = 'mouseup';
+			var mousedown = 'mousedown';
+			var EventListener = 'EventListener';
+			var addEventListener = 'add'+EventListener;
+			var removeEventListener = 'remove'+EventListener;
+			var newScrollX, newScrollY;
+
+			var dragged = [];
+			var reset = function(i, el) {
+				for (i = 0; i < dragged.length;) {
+					el = dragged[i++];
+					el = el.container || el;
+					el[removeEventListener](mousedown, el.md, 0);
+					_window[removeEventListener](mouseup, el.mu, 0);
+					_window[removeEventListener](mousemove, el.mm, 0);
+				}
+
+				// cloning into array since HTMLCollection is updated dynamically
+				dragged = [].slice.call(_document.getElementsByClassName('dragscroll'));
+				for (i = 0; i < dragged.length;) {
+					(function(el, lastClientX, lastClientY, pushed, scroller, cont){
+						(cont = el.container || el)[addEventListener](
+							mousedown,
+							cont.md = function(e) {
+								if (!el.hasAttribute('nochilddrag') ||
+									_document.elementFromPoint(
+										e.pageX, e.pageY
+									) == cont
+								) {
+									if(e.button == 0){
+										pushed = 1;
+										lastClientX = e.clientX;
+										lastClientY = e.clientY;
+
+										e.preventDefault();
+									}
+								}
+							}, 0
+						);
+
+						_window[addEventListener](
+							mouseup, cont.mu = function() {
+								pushed = 0;
+							}, 0
+						);
+
+						_window[addEventListener](
+							mousemove,
+							cont.mm = function(e) {
+								if (pushed) {
+									(scroller = el.scroller||el).scrollLeft -=
+										newScrollX = (- lastClientX + (lastClientX=e.clientX));
+									scroller.scrollTop -=
+										newScrollY = (- lastClientY + (lastClientY=e.clientY));
+									if (el == _document.body) {
+										(scroller = _document.documentElement).scrollLeft -= newScrollX;
+										scroller.scrollTop -= newScrollY;
+									}
+								}
+							}, 0
+						);
+					 })(dragged[i++]);
+				}
+			}
+
+			  
+			if (_document.readyState == 'complete') {
+				reset();
+			} else {
+				_window[addEventListener]('load', reset, 0);
+			}
+
+			exports.reset = reset;
+		}));
+		</script>
+		<script type="text/javascript">
+		function hasClass(el, className) {
+			if (el.classList)
+				return el.classList.contains(className);
+			return !!el.className.match(new RegExp('(\\s|^)' + className + '(\\s|$)'));
+		}
+		
+		function addClass(el, className) {
+			if (el.classList)
+				el.classList.add(className)
+			else if (!hasClass(el, className))
+				el.className += " " + className;
+		}
+
+		function removeClass(el, className) {
+			if (el.classList)
+				el.classList.remove(className)
+			else if (hasClass(el, className))
+			{
+				var reg = new RegExp('(\\s|^)' + className + '(\\s|$)');
+				el.className = el.className.replace(reg, ' ');
+			}
+		}
+		
+		var addEvent = function(object, type, callback) {
+			if (object == null || typeof(object) == 'undefined') return;
+			if (object.addEventListener) {
+				object.addEventListener(type, callback, false);
+			} else if (object.attachEvent) {
+				object.attachEvent("on" + type, callback);
+			} else {
+				object["on"+type] = callback;
+			}
+		};
+		
+		window.mouseX = 0;
+		window.mouseY = 0;
+		
+		window.zoomInOut = 400;// px
+		window.scrollLeftLocked = false;
+		window.scrollTopLocked = false;
+		
+		function zoomin() {
+			var zoomImage = document.getElementById("map");
+			if (zoomImage.clientWidth < 5000) {
+				var dragScroll = document.getElementsByClassName("dragscroll")[0];
+				var dragScrollRect = dragScroll.getBoundingClientRect();
+				var dsScreenHeight = dragScrollRect.bottom-dragScrollRect.top;
+				var dsScreenWidth = dragScrollRect.right-dragScrollRect.left;
+
+				var zoomImageclientWidthOld = zoomImage.clientWidth;
+				var zoomImageclientHeightOld = zoomImage.clientHeight;
+				var dragScrollscrollLeftOld = dragScroll.scrollLeft;
+				var dragScrollscrollTopOld = dragScroll.scrollTop;
+				// Zoom in
+				zoomImage.style.width = (zoomImage.clientWidth + window.zoomInOut) + "px";
+				// Left Top corner
+				dragScroll.scrollLeft = Math.round((zoomImage.clientWidth/zoomImageclientWidthOld)*(dragScrollscrollLeftOld));
+				dragScroll.scrollTop = Math.round((zoomImage.clientHeight/zoomImageclientHeightOld)*(dragScrollscrollTopOld));
+				// Center
+				dragScroll.scrollLeft += (Math.round((zoomImage.clientWidth/zoomImageclientWidthOld)*(dsScreenWidth))-dsScreenWidth)/2;
+				dragScroll.scrollTop += (Math.round((zoomImage.clientHeight/zoomImageclientHeightOld)*(dsScreenHeight))-dsScreenHeight)/2;
+				// Mouse follow
+				dragScroll.scrollLeft -= (Math.round((zoomImage.clientWidth/zoomImageclientWidthOld)*((dsScreenWidth/2)-window.mouseX))-((dsScreenWidth/2)-window.mouseX));
+				dragScroll.scrollTop -= (Math.round((zoomImage.clientHeight/zoomImageclientHeightOld)*((dsScreenHeight/2)-window.mouseY))-((dsScreenHeight/2)-window.mouseY));
+			}
+		}
+
+		function zoomout() {
+			var zoomImage = document.getElementById("map");
+			if (zoomImage.clientWidth > document.getElementsByClassName("dragscroll")[0].clientWidth) {
+				var dragScroll = document.getElementsByClassName("dragscroll")[0];
+				var dragScrollRect = dragScroll.getBoundingClientRect();
+				var dsScreenHeight = dragScrollRect.bottom-dragScrollRect.top;
+				var dsScreenWidth = dragScrollRect.right-dragScrollRect.left;
+
+				var zoomImageclientWidthOld = zoomImage.clientWidth;
+				var zoomImageclientHeightOld = zoomImage.clientHeight;
+				var dragScrollscrollLeftOld = dragScroll.scrollLeft;
+				var dragScrollscrollTopOld = dragScroll.scrollTop;
+				// Zoom out
+				zoomImage.style.width = (zoomImage.clientWidth - window.zoomInOut) + "px";				
+				// Left Top corner
+				dragScroll.scrollLeft = Math.round((zoomImage.clientWidth/zoomImageclientWidthOld)*(dragScrollscrollLeftOld));
+				dragScroll.scrollTop = Math.round((zoomImage.clientHeight/zoomImageclientHeightOld)*(dragScrollscrollTopOld));
+				// Center and Mouse follow
+				if(zoomImage.clientWidth != dragScroll.scrollLeft+dsScreenWidth){
+					window.scrollLeftLocked = false;
+				}
+				//if(zoomImage.clientWidth > dragScroll.scrollLeft+dsScreenWidth){
+				if(zoomImage.clientWidth >= dragScroll.scrollLeft+dsScreenWidth && window.scrollLeftLocked == false){// Lock scroll to right side
+					if(zoomImage.clientWidth == dragScroll.scrollLeft+dsScreenWidth){
+						window.scrollLeftLocked = true;// Scrollbar is 100 % on right side but locked next wheel scroll
+						dragScroll.scrollLeft += (Math.round((zoomImage.clientWidth/zoomImageclientWidthOld)*(dsScreenWidth))-dsScreenWidth)/2;
+						dragScroll.scrollLeft -= (Math.round((zoomImage.clientWidth/zoomImageclientWidthOld)*((dsScreenWidth/2)-window.mouseX))-((dsScreenWidth/2)-window.mouseX));
+						console.log("Lock Right");
+						dragScroll.scrollLeft += (zoomImage.clientWidth-(dsScreenWidth+dragScroll.scrollLeft))/2;// Set scrollLeft on half from 100 %
+					}else{
+						dragScroll.scrollLeft += (Math.round((zoomImage.clientWidth/zoomImageclientWidthOld)*(dsScreenWidth))-dsScreenWidth)/2;
+						dragScroll.scrollLeft -= (Math.round((zoomImage.clientWidth/zoomImageclientWidthOld)*((dsScreenWidth/2)-window.mouseX))-((dsScreenWidth/2)-window.mouseX));
+					}
+				}
+				if(zoomImage.clientHeight != dragScroll.scrollTop+dsScreenHeight){
+					window.scrollTopLocked = false;
+				}
+				//if(zoomImage.clientHeight > dragScroll.scrollTop+dsScreenHeight){
+				if(zoomImage.clientHeight >= dragScroll.scrollTop+dsScreenHeight && window.scrollTopLocked == false){// Lock scroll to bottom side
+					if(zoomImage.clientHeight == dragScroll.scrollTop+dsScreenHeight){
+						window.scrollTopLocked = true;// Scrollbar is 100 % on bottom side but locked next wheel scroll
+						dragScroll.scrollTop += (Math.round((zoomImage.clientHeight/zoomImageclientHeightOld)*(dsScreenHeight))-dsScreenHeight)/2;
+						dragScroll.scrollTop -= (Math.round((zoomImage.clientHeight/zoomImageclientHeightOld)*((dsScreenHeight/2)-window.mouseY))-((dsScreenHeight/2)-window.mouseY));
+						console.log("Lock Bottom");
+						dragScroll.scrollTop += (zoomImage.clientHeight-(dsScreenHeight+dragScroll.scrollTop))/2;// Set scrollTop on half from 100 %
+					}else{
+						dragScroll.scrollTop += (Math.round((zoomImage.clientHeight/zoomImageclientHeightOld)*(dsScreenHeight))-dsScreenHeight)/2;
+						dragScroll.scrollTop -= (Math.round((zoomImage.clientHeight/zoomImageclientHeightOld)*((dsScreenHeight/2)-window.mouseY))-((dsScreenHeight/2)-window.mouseY));
+					}
+				}
+			}
+		}
+		
+		addEvent(window, "wheel", function(event) {
+			//if(event.shiftKey){
+				if (event.deltaY < 0) {
+					console.log('scrolling up');
+					zoomin();
+				} else if (event.deltaY > 0) {
+					console.log('scrolling down');
+					zoomout();
+				}
+			//}
+		});
+		
+		addEvent(window, "mousemove", function(event) {
+			var rect = document.getElementsByClassName("dragscroll")[0].getBoundingClientRect();
+			window.mouseX = event.clientX;
+			window.mouseY = event.clientY-rect.top > 0 ? event.clientY-rect.top : 0;
+			//console.log(rect.top, rect.right, rect.bottom, rect.left);
+			//console.log("mouse location:", event.clientX, event.clientY-rect.top > 0 ? event.clientY-rect.top : 0);
+		});
+		
+		var mousedownTimeout;
+		addEvent(window, "mousedown", function(event) {
+			mousedownTimeout = setInterval(function() {
+				if(event.target.id == "zoomIn") {
+					console.log("in");
+					zoomin();
+				} else if(event.target.id == "zoomOut") {
+					console.log("out");
+					zoomout();
+				}
+			}, 100);
+			if(event.target == document.getElementById("map")){
+				event.preventDefault();
+			}
+		});
+		
+		addEvent(window, "mouseup", function(event) {
+			window.clearTimeout(mousedownTimeout);
+		});
+		
+		addEvent(window, "resize", function(event) {
+			console.log("resize");
+			windowSize();
+		});
+		
+		addEvent(window, "load", function(event) {
+			console.log("load");
+			windowSize();
+			
+			addEvent(document.getElementsByClassName("dragscroll")[0], "contextmenu", function(event) {
+				console.log("contextmenu");
+				// Stop the context menu
+				event.preventDefault();
+				return false;
+			});
+		});
+		
+		function windowSize(){
+			var rect = document.getElementsByClassName("dragscroll")[0].getBoundingClientRect();
+			var zoomImage = document.getElementById("map");
+			zoomImage.style.width = '100%';
+			zoomImage.style.height = 'auto';
+			if(zoomImage.clientWidth < rect.right-rect.left){
+				zoomImage.style.width = '100%';
+				zoomImage.style.height = 'auto';
+			} else if(zoomImage.clientHeight < rect.bottom-rect.top){
+				zoomImage.style.height = '100%';
+				zoomImage.style.width = 'auto';
+			}
+			
+			var w = window,
+			d = document,
+			e = d.documentElement,
+			g = d.getElementsByTagName('body')[0],
+			pageWidth = w.innerWidth || e.clientWidth || g.clientWidth,
+			pageHeight = w.innerHeight|| e.clientHeight|| g.clientHeight;
+			
+			document.getElementsByClassName("dragscroll")[0].style.height = (pageHeight-document.getElementById('navbar').offsetHeight) + 'px';
+			document.getElementsByClassName("dragscroll")[0].style.marginTop = document.getElementById('navbar').offsetHeight + 'px';
+		}
+		</script>
+	</head>
+	<body>
+		<div id="navbar">
+			<span>DayZ - The Hiking (Tourist) simulator --- 
+				<a href="#C+TACTICAL" onclick="document.getElementById('map').src = 'maps/chernarus_plus_tactical.jpg'; return false;">Chernarus+ Tactical</a>
+				 - <a href="#C+TOWNS" onclick="document.getElementById('map').src = 'maps/chernarus_plus_towns.png'; return false;">Chernarus+ Towns</a>
+				 - <a href="#C+SMALLER" onclick="document.getElementById('map').src = 'maps/chernarus_plus_4MB.jpg'; return false;">Chernarus+ Smaller</a>
+				 - <a href="#C-TOURIST" onclick="document.getElementById('map').src = 'maps/chernarus_tourist_map.jpg'; return false;">Chernarus Tourist Map</a>
+			</span> --- 
+			<button type="button" id="zoomIn"> Zoom In</button>
+			<button type="button" id="zoomOut"> Zoom Out</button>
+			or Mouse Wheel - <a href="https://www.tekrevue.com/tip/fix-slow-steam-browser/" target="_blank">fix steam browser</a>
+			--- <select onchange="window.open(this.options[this.selectedIndex].value, '_blank');">
+				<option value>other maps</option>
+				<option value="https://dayz.ginfo.gg/">dayz.ginfo.gg</option>
+				<option value="http://www.dayztv.com/map/">dayztv.com</option>
+				<option value="https://dayz.xam.nu/">dayz.xam.nu</option>
+			</select>
+		</div>
+
+		<div class="main dragscroll">
+			<img id="map" src="maps/chernarus_plus_tactical.jpg" />
+		</div>
+	</body>
+</html>
